@@ -25,6 +25,7 @@ public class FileStoreController {
                                                     @RequestParam("tenantId") String tenantId,
                                                     @RequestParam("module") String module) {
         files.forEach(file -> {
+            log.info(file.getName());
             InputStream is = null;
             try {
                 is = file.getInputStream();
@@ -32,7 +33,10 @@ public class FileStoreController {
                 e.printStackTrace();
             }
             BufferedReader br = new BufferedReader(new InputStreamReader(is));
-            br.lines().forEach(log::info);
+            br.lines().forEach(line -> {
+                line.toString();
+            });
+            log.info("File read successfully");
         });
         log.info(tenantId);
         log.info(module);

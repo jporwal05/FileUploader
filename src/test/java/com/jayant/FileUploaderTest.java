@@ -29,6 +29,7 @@ class FileUploaderTest {
 
     private URL fileStoreUrl;
     private HttpHeaders httpHeaders;
+    RestTemplate restTemplate;
 
     @BeforeEach
     void setUp() throws MalformedURLException {
@@ -36,6 +37,7 @@ class FileUploaderTest {
         fileStoreUrl = new URL(host, "/filestore/v1/files");
         httpHeaders = new HttpHeaders();
         httpHeaders.setContentType(MediaType.MULTIPART_FORM_DATA);
+        restTemplate = new RestTemplate();
     }
 
     @Test
@@ -45,7 +47,7 @@ class FileUploaderTest {
         log.info(file.getName());
 
         MultiValueMap<String, String> fileMap = getFileMap(file,
-                MediaType.asMediaType(MimeType.valueOf("application/gzip")));
+                MediaType.asMediaType(MimeType.valueOf("text/plain")));
 
         HttpEntity<Resource> fileEntity = new HttpEntity<>(new FileSystemResource(file), fileMap);
 
@@ -56,16 +58,12 @@ class FileUploaderTest {
 
 
         HttpEntity<MultiValueMap<String, Object>> httpEntity = new HttpEntity<>(formData, httpHeaders);
-        RestTemplate restTemplate = new RestTemplate();
-        ResponseEntity<StorageResponse> response = restTemplate
-                .postForEntity(fileStoreUrl.toString(), httpEntity, StorageResponse.class);
-
-        log.info(String.valueOf(response));
+        timedCall(httpEntity);
     }
 
     @Test
     void shouldUploadMultipleFiles() throws MalformedURLException {
-        var file = getTestFile("files/test.txt");
+        var file = getTestFile("files/test-2.gz");
         var anotherFile = getTestFile("files/test.csv");
 
         MultiValueMap<String, String> fileMap = getFileMap(file,
@@ -84,11 +82,33 @@ class FileUploaderTest {
 
 
         HttpEntity<MultiValueMap<String, Object>> httpEntity = new HttpEntity<>(formData, httpHeaders);
-        RestTemplate restTemplate = new RestTemplate();
-        ResponseEntity<StorageResponse> response = restTemplate
-                .postForEntity(fileStoreUrl.toString(), httpEntity, StorageResponse.class);
+        timedCall(httpEntity);
+    }
 
-        log.info(String.valueOf(response));
+    @Test
+    void shouldUploadALargeFile() throws MalformedURLException {
+        var file = getTestFile("files/large-file.deb");
+
+        log.info(file.getName());
+
+        MultiValueMap<String, String> fileMap = getFileMap(file,
+                MediaType.asMediaType(MimeType.valueOf("application/deb")));
+
+        HttpEntity<Resource> fileEntity = new HttpEntity<>(new FileSystemResource(file), fileMap);
+
+        MultiValueMap<String, Object> formData = new LinkedMultiValueMap<>();
+        formData.add("file", fileEntity);
+        formData.add("tenantId", TENANT_ID);
+        formData.add("module", MODULE);
+
+
+        HttpEntity<MultiValueMap<String, Object>> httpEntity = new HttpEntity<>(formData, httpHeaders);
+        timedCall(httpEntity);
+    }
+
+    private File getTestFile(String relativePath) {
+        return new File(Objects.requireNonNull(getClass()
+                .getClassLoader().getResource(relativePath)).getFile());
     }
 
     private MultiValueMap<String, String> getFileMap(File file, MediaType mediaType) {
@@ -102,8 +122,11 @@ class FileUploaderTest {
         return fileMap;
     }
 
-    private File getTestFile(String relativePath) {
-        return new File(Objects.requireNonNull(getClass()
-                .getClassLoader().getResource(relativePath)).getFile());
+    private void timedCall(HttpEntity<MultiValueMap<String, Object>> httpEntity) {
+        long startTime = System.currentTimeMillis();
+        ResponseEntity<StorageResponse> response = restTemplate
+                .postForEntity(fileStoreUrl.toString(), httpEntity, StorageResponse.class);
+        long totalTime = System.currentTimeMillis() - startTime;
+        log.info(String.format("%s, %s", totalTime, response));
     }
 }
